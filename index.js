@@ -1,6 +1,5 @@
 require("dotenv").config({ path: __dirname + "/.env" });
 const { twitterClient } = require("./twitterClient.js");
-const CronJob = require("cron").CronJob;
 const express = require('express');
 const bodyParser = require('body-parser');
 const { Configuration, OpenAIApi } = require('openai');
@@ -19,27 +18,27 @@ const port = process.env.PORT || 3001;
 
 app.post("/tweet", async (req, res) => {
 
-    let {prompt, seconds, minutes, hours  } = req.body;
+    let {topic, seconds, minutes, hours  } = req.body;
     if(!seconds) {
         return res.json({
             message: "Please provide seconds"
         })
     }
     if(!minutes) {
-        minutes='*';
+        minutes=0;
     }
     if(!hours) {
-        hours='*'
+        hours=0;
     }
+    let timeInterval= seconds+60*minutes+3600*hours;
     
-    
-    const cronTweet = new CronJob(` ${seconds} ${minutes} ${hours} * * *`, async () => {
+    const Tweet = async () => {
 
         try {
             const completion =  await openai.createChatCompletion({
                 model: "gpt-3.5-turbo",
                 messages: [
-                    {role: "user", content: `${prompt}`},
+                    {role: "user", content: `Give me a tweet upon ${topic}`},
                 ],
                 max_tokens: 4000,
                 temperature: 0.9,
@@ -51,12 +50,14 @@ app.post("/tweet", async (req, res) => {
             console.log(completion.data.choices[0].message.content);
             await twitterClient.v2.tweet(`${completion.data.choices[0].message.content}`);
             console.log("Tweeted");
-          } catch (e) {
+        } catch (e) {
             console.log(e)
           }
-      });
+    };
+
+    setInterval(Tweet, timeInterval*1000);
       
-    cronTweet.start();
+    
     res.json({
         message: "Tweet scheduled"
     });
